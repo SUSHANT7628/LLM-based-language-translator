@@ -26,6 +26,11 @@ def main():
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--max-len", type=int, default=64)
     ap.add_argument("--min-freq", type=int, default=2)
+    ap.add_argument("--max-vocab", type=int, default=None, help="keep only the N most frequent words per language")
+    ap.add_argument("--d-model", type=int, default=512)
+    ap.add_argument("--heads", type=int, default=8)
+    ap.add_argument("--enc-layers", type=int, default=3)
+    ap.add_argument("--dec-layers", type=int, default=3)
     ap.add_argument("--limit", type=int, default=None, help="use only the first N training pairs")
     ap.add_argument("--gen-check", type=int, default=200, help="validation sentences to generate")
     ap.add_argument("--steps", type=int, default=50, help="reverse diffusion steps")
@@ -43,8 +48,8 @@ def main():
         tr_s, tr_t = tr_s[: args.limit], tr_t[: args.limit]
     print(f"train pairs: {len(tr_s):,}  validation pairs: {len(va_s):,}")
 
-    src_vocab = dm.build_vocab(tr_s, args.min_freq)
-    tgt_vocab = dm.build_vocab(tr_t, args.min_freq)
+    src_vocab = dm.build_vocab(tr_s, args.min_freq, args.max_vocab)
+    tgt_vocab = dm.build_vocab(tr_t, args.min_freq, args.max_vocab)
     print(f"vocab  en: {len(src_vocab):,}  hi: {len(tgt_vocab):,}")
 
     train_dl = DataLoader(dm.ParallelDataset(tr_s, tr_t, src_vocab, tgt_vocab, args.max_len),
@@ -52,7 +57,8 @@ def main():
     val_dl = DataLoader(dm.ParallelDataset(va_s, va_t, src_vocab, tgt_vocab, args.max_len),
                         batch_size=args.batch_size)
 
-    cfg = dm.Config(len(src_vocab), len(tgt_vocab), max_len=args.max_len)
+    cfg = dm.Config(len(src_vocab), len(tgt_vocab), max_len=args.max_len, d_model=args.d_model,
+                    n_heads=args.heads, enc_layers=args.enc_layers, dec_layers=args.dec_layers)
     model = dm.TextDiffusionTranslator(cfg).to(device)
     print(f"parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
     # model.parameters() now includes both embedding tables
